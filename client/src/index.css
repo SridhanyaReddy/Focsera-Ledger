@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-midnight-navy: #14243A;
+    --color-deep-blue: #233D5B;
+    --color-muted-blue: #52799D;
+    --color-pale-blue: #DCE7F0;
+    --color-soft-bg: #F4F7FA;
+    --color-pure-white: #FFFFFF;
+    --color-primary-text: #182333;
+    --color-secondary-text: #697586;
+    --color-borders: #E2E7ED;
+    --color-success: #287A57;
+    --color-warning: #B98232;
+    --color-danger: #B84B4B;
+  }
+
+  html {
+    font-family: 'Geist', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    background-color: #F4F7FA;
+    color: #182333;
+  }
+
+  body {
+    background-color: #F4F7FA;
+    color: #182333;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
+  }
+
+  /* Thin subtle scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+  }
+}
+
+/* Institutional Clean White Card */
+.enterprise-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E2E7ED;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(20, 36, 58, 0.04);
+}
+
+.enterprise-table-header {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-family: 'Geist', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #697586;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background-color: #F8FAFC;
+  border-bottom: 1px solid #E2E7ED;
+}
+
+.enterprise-table-cell {
+  padding: 0.875rem 1rem;
+  font-size: 0.8125rem;
+  color: #182333;
+  border-bottom: 1px solid #EEF2F6;
+  white-space: nowrap;
+}
+
+/* Tabular Financial Numbers */
+.font-financial {
+  font-family: 'IBM Plex Mono', monospace;
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  @page {
+    margin: 10mm;
+    size: auto;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  aside, header, nav, .print\:hidden {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+}
