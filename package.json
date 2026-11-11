@@ -1,6 +1,7 @@
 {
   "name": "focsera",
   "version": "1.0.0",
+  "type": "module",
   "description": "Focsera - Complete Invoice Generator & Ledger Management System",
   "private": true,
   "scripts": {
