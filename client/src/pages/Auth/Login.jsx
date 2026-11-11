@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { Lock, Mail, ArrowRight, ShieldCheck, KeyRound } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function Login() {
   const { login } = useAuth();
   const { error } = useToast();
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState('admin@focsera.in');
-  const [password, setPassword] = useState('focsera@15');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -93,30 +93,6 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Institutional Credentials Capsule */}
-          <div className="p-2.5 bg-[#F4F7FA] border border-[#E2E7ED] rounded flex items-center justify-between">
-            <div className="flex items-center gap-2 min-w-0">
-              <KeyRound className="w-3.5 h-3.5 text-[#52799D] shrink-0" />
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold text-[#697586] uppercase font-sans tracking-wider block">
-                  Default Credentials
-                </span>
-                <span className="text-[11px] font-mono text-[#182333] truncate block">
-                  admin@focsera.in • Admin@Focsera2026
-                </span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('admin@focsera.in');
-                setPassword('focsera@15');
-              }}
-              className="px-2 py-0.5 bg-[#FFFFFF] hover:bg-[#EEF4F8] text-[#52799D] text-xs font-semibold rounded border border-[#E2E7ED] transition-colors"
-            >
-              Fill
-            </button>
-          </div>
 
           <button
             type="submit"
