@@ -1,6 +1,8 @@
 import Project from '../models/Project.js';
 import Client from '../models/Client.js';
 import Division from '../models/Division.js';
+import Invoice from '../models/Invoice.js';
+import Payment from '../models/Payment.js';
 import { getNextSequenceNumber } from '../services/numberingService.js';
 import { getProjectFinancialOverview } from '../services/ledgerService.js';
 import { logAuditEvent } from '../services/auditService.js';
