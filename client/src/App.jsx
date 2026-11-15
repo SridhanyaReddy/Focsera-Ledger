@@ -32,6 +32,7 @@ import TodoPage from './pages/Todo/TodoPage';
 function ProtectedLayout() {
   const { admin, loading, setupRequired } = useAuth();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   if (loading) {
     return (
@@ -54,14 +55,19 @@ function ProtectedLayout() {
 
   return (
     <div className="min-h-screen bg-[#F4F7FA] text-[#182333] flex font-sans">
-      <Sidebar isCollapsed={isSidebarCollapsed} setIsCollapsed={setIsSidebarCollapsed} />
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
+        setIsCollapsed={setIsSidebarCollapsed}
+        isMobileOpen={isMobileSidebarOpen}
+        setIsMobileOpen={setIsMobileSidebarOpen}
+      />
       <div
-        className={`flex-1 flex flex-col transition-all duration-200 min-w-0 ${
-          isSidebarCollapsed ? 'pl-20' : 'pl-64'
+        className={`flex-1 flex flex-col transition-all duration-200 min-w-0 pl-0 ${
+          isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64'
         }`}
       >
-        <Navbar />
-        <main className="flex-1 p-6 sm:p-8 max-w-[1500px] w-full mx-auto">
+        <Navbar onToggleMobileMenu={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)} />
+        <main className="flex-1 p-3 sm:p-6 md:p-8 max-w-[1500px] w-full mx-auto">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/clients" element={<ClientsPage />} />

@@ -11,12 +11,13 @@ import {
   X,
   Calendar,
   Command,
+  Menu,
 } from 'lucide-react';
 import api from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { formatINR } from '../../utils/formatters';
 
-export default function Navbar() {
+export default function Navbar({ onToggleMobileMenu }) {
   const { company } = useAuth();
   const navigate = useNavigate();
 
@@ -76,9 +77,18 @@ export default function Navbar() {
       searchResults.transactions?.length > 0);
 
   return (
-    <header className="h-16 bg-[#FFFFFF] border-b border-[#E2E7ED] sticky top-0 z-20 px-6 sm:px-8 flex items-center justify-between select-none font-sans">
+    <header className="h-16 bg-[#FFFFFF] border-b border-[#E2E7ED] sticky top-0 z-20 px-3 sm:px-6 md:px-8 flex items-center justify-between select-none font-sans gap-2 sm:gap-4">
+      {/* Mobile Hamburger Button */}
+      <button
+        onClick={onToggleMobileMenu}
+        aria-label="Open Navigation Menu"
+        className="md:hidden p-2 rounded-lg text-[#182333] hover:bg-[#F4F7FA] border border-[#E2E7ED] shrink-0"
+      >
+        <Menu className="w-5 h-5 text-[#52799D]" />
+      </button>
+
       {/* Global Search Bar */}
-      <div className="relative w-full max-w-md" ref={searchRef}>
+      <div className="relative w-full max-w-xs sm:max-w-md" ref={searchRef}>
         <div className="relative flex items-center">
           <Search className="w-4 h-4 text-[#697586] absolute left-3.5 pointer-events-none" />
           <input
