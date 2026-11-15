@@ -28,27 +28,58 @@ export async function getProjects(req, res) {
         .populate('division', 'name code category')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(Number(limit))
+        .lean(),
       Project.countDocuments(filter),
     ]);
 
-    // Enhance with live financial overview
-    const projectsWithFinancials = await Promise.all(
-      projects.map(async (prj) => {
-        try {
-          const overview = await getProjectFinancialOverview(prj._id);
-          return {
-            ...prj.toObject(),
-            totalInvoiced: overview.totalInvoiced,
-            totalReceived: overview.totalReceived,
-            outstandingAmount: overview.outstandingAmount,
-            paymentStatus: overview.paymentStatus,
-          };
-        } catch {
-          return prj.toObject();
-        }
-      })
-    );
+    if (projects.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        pagination: { total: 0, page: Number(page), limit: Number(limit), pages: 0 },
+      });
+    }
+
+    const projectIds = projects.map((p) => p._id);
+
+    // Fast batch aggregation across all projects in 2 queries
+    const [invoiceStats, paymentStats] = await Promise.all([
+      Invoice.aggregate([
+        { $match: { project: { $in: projectIds }, status: { $nin: ['Cancelled', 'Draft'] } } },
+        { $group: { _id: '$project', totalInvoiced: { $sum: '$grandTotal' } } },
+      ]),
+      Payment.aggregate([
+        { $match: { project: { $in: projectIds }, paymentType: { $nin: ['Refund', 'Reversal'] }, isReversed: false } },
+        { $group: { _id: '$project', totalReceived: { $sum: '$amount' } } },
+      ]),
+    ]);
+
+    const invoiceMap = new Map(invoiceStats.map((i) => [i._id.toString(), i.totalInvoiced]));
+    const paymentMap = new Map(paymentStats.map((p) => [p._id.toString(), p.totalReceived]));
+
+    const projectsWithFinancials = projects.map((prj) => {
+      const pId = prj._id.toString();
+      const totalInvoiced = Math.round((invoiceMap.get(pId) || 0) * 100) / 100;
+      const totalReceived = Math.round((paymentMap.get(pId) || 0) * 100) / 100;
+      const agreedProjectValue = Math.round((prj.agreedProjectValue || 0) * 100) / 100;
+      const outstandingAmount = Math.max(0, Math.round((agreedProjectValue - totalReceived) * 100) / 100);
+
+      let paymentStatus = 'Pending';
+      if (totalReceived >= agreedProjectValue && agreedProjectValue > 0) {
+        paymentStatus = 'Fully Settled';
+      } else if (totalReceived > 0) {
+        paymentStatus = 'Partially Received';
+      }
+
+      return {
+        ...prj,
+        totalInvoiced,
+        totalReceived,
+        outstandingAmount,
+        paymentStatus,
+      };
+    });
 
     return res.json({
       success: true,

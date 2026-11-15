@@ -32,27 +32,55 @@ export async function getClients(req, res) {
     const skip = (Number(page) - 1) * Number(limit);
 
     const [clients, total] = await Promise.all([
-      Client.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)),
+      Client.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
       Client.countDocuments(filter),
     ]);
 
-    // Enhance each client with their quick financial overview
-    const clientsWithFinancials = await Promise.all(
-      clients.map(async (client) => {
-        try {
-          const profile = await getClientFinancialProfile(client._id);
-          return {
-            ...client.toObject(),
-            totalInvoiced: profile.totalInvoiced,
-            totalReceived: profile.totalReceived,
-            outstandingBalance: profile.currentOutstanding,
-            unallocatedAdvances: profile.unallocatedAdvances,
-          };
-        } catch {
-          return client.toObject();
-        }
-      })
-    );
+    if (clients.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        pagination: { total: 0, page: Number(page), limit: Number(limit), pages: 0 },
+      });
+    }
+
+    const clientIds = clients.map((c) => c._id);
+
+    // High performance batch aggregation for all clients in ONE trip
+    const [invoiceStats, paymentStats, advanceStats] = await Promise.all([
+      Invoice.aggregate([
+        { $match: { client: { $in: clientIds }, status: { $nin: ['Cancelled', 'Draft'] } } },
+        { $group: { _id: '$client', totalInvoiced: { $sum: '$grandTotal' } } },
+      ]),
+      Payment.aggregate([
+        { $match: { client: { $in: clientIds }, paymentType: { $nin: ['Refund', 'Reversal'] }, isReversed: false } },
+        { $group: { _id: '$client', totalReceived: { $sum: '$amount' } } },
+      ]),
+      Payment.aggregate([
+        { $match: { client: { $in: clientIds }, unallocatedAmount: { $gt: 0 }, isReversed: false } },
+        { $group: { _id: '$client', unallocatedAdvances: { $sum: '$unallocatedAmount' } } },
+      ]),
+    ]);
+
+    const invoiceMap = new Map(invoiceStats.map((i) => [i._id.toString(), i.totalInvoiced]));
+    const paymentMap = new Map(paymentStats.map((p) => [p._id.toString(), p.totalReceived]));
+    const advanceMap = new Map(advanceStats.map((a) => [a._id.toString(), a.unallocatedAdvances]));
+
+    const clientsWithFinancials = clients.map((client) => {
+      const cId = client._id.toString();
+      const totalInvoiced = Math.round((invoiceMap.get(cId) || 0) * 100) / 100;
+      const totalReceived = Math.round((paymentMap.get(cId) || 0) * 100) / 100;
+      const unallocatedAdvances = Math.round((advanceMap.get(cId) || 0) * 100) / 100;
+      const outstandingBalance = Math.max(0, Math.round((totalInvoiced - totalReceived) * 100) / 100);
+
+      return {
+        ...client,
+        totalInvoiced,
+        totalReceived,
+        outstandingBalance,
+        unallocatedAdvances,
+      };
+    });
 
     return res.json({
       success: true,

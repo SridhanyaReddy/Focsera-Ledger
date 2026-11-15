@@ -37,7 +37,8 @@ export async function getInvoices(req, res) {
         .populate('division', 'name code category')
         .sort({ invoiceDate: -1, createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(Number(limit))
+        .lean(),
       Invoice.countDocuments(filter),
     ]);
 

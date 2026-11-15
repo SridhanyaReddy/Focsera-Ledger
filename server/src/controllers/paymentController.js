@@ -47,7 +47,8 @@ export async function getPayments(req, res) {
         .populate('receipt', 'receiptNumber')
         .sort({ paymentDate: -1, createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(Number(limit))
+        .lean(),
       Payment.countDocuments(filter),
     ]);
 

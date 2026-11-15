@@ -1,17 +1,40 @@
 import mongoose from 'mongoose';
 
+let cachedConn = null;
+let cachedPromise = null;
 let mongoMemoryServer = null;
 
 export async function connectDB() {
   const uri = process.env.MONGODB_URI;
 
   if (uri) {
-    console.log('Connecting to MongoDB Atlas / configured URI...');
-    const conn = await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 8000,
-    });
-    console.log(`Connected to MongoDB Atlas / Database: ${conn.connection.host}`);
-    return conn;
+    if (mongoose.connection.readyState === 1) {
+      return mongoose.connection;
+    }
+
+    if (cachedConn) {
+      return cachedConn;
+    }
+
+    if (!cachedPromise) {
+      const opts = {
+        serverSelectionTimeoutMS: 5000,
+        maxPoolSize: 10,
+        minPoolSize: 2,
+        socketTimeoutMS: 45000,
+      };
+      cachedPromise = mongoose.connect(uri, opts).then((mongooseInstance) => {
+        return mongooseInstance;
+      });
+    }
+
+    try {
+      cachedConn = await cachedPromise;
+      return cachedConn;
+    } catch (e) {
+      cachedPromise = null;
+      throw e;
+    }
   }
 
   // Fallback to in-memory MongoDB instance for local dev & testing without external dependencies
