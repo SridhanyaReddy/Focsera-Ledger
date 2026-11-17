@@ -6,6 +6,8 @@ import Division from '../models/Division.js';
 import Quotation from '../models/Quotation.js';
 import CreditNote from '../models/CreditNote.js';
 import Transaction from '../models/Transaction.js';
+import Todo from '../models/Todo.js';
+import FollowUp from '../models/FollowUp.js';
 import { round } from '../services/calculationService.js';
 
 /**
@@ -209,6 +211,31 @@ export async function getDashboardData(req, res) {
       .sort((a, b) => b.billed - a.billed)
       .slice(0, 5);
 
+    // 7. Client Portfolio Insights (Total, Business vs Individual, Recent Clients)
+    const [recentClientsList, clientTypeStats] = await Promise.all([
+      Client.find({ isArchived: false }).sort({ createdAt: -1 }).limit(6).lean(),
+      Client.aggregate([
+        { $match: { isArchived: false } },
+        { $group: { _id: '$clientType', count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    // 8. Operational Follow-ups & Priority Tasks
+    const [upcomingFollowups, pendingTodos] = await Promise.all([
+      FollowUp.find({ status: { $ne: 'Completed' } })
+        .populate('project', 'name projectId')
+        .populate('client', 'name businessName phone')
+        .sort({ meetingDate: 1 })
+        .limit(5)
+        .lean(),
+      Todo.find({ isCompleted: false })
+        .populate('project', 'name')
+        .populate('client', 'name')
+        .sort({ priority: 1, dueDate: 1 })
+        .limit(5)
+        .lean(),
+    ]);
+
     return res.json({
       success: true,
       data: {
@@ -222,6 +249,8 @@ export async function getDashboardData(req, res) {
           totalClients: clientsCount,
           totalInvoices: invoices.length,
           pendingQuotations: quotationsCount,
+          pendingTodosCount: pendingTodos.length,
+          upcomingFollowupsCount: upcomingFollowups.length,
         },
         charts: {
           monthlyTrends,
@@ -234,6 +263,10 @@ export async function getDashboardData(req, res) {
         },
         topClientExposures,
         projectHealth,
+        recentClients: recentClientsList,
+        clientTypeStats,
+        upcomingFollowups,
+        pendingTodos,
         recent: {
           payments: recentPayments,
           projects: recentProjects,
