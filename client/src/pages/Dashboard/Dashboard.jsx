@@ -1,23 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp,
   AlertCircle,
   Clock,
   Briefcase,
   Users,
-  FileText,
-  FileSpreadsheet,
-  ArrowUpRight,
-  CreditCard,
-  Plus,
-  ChevronRight,
-  Filter,
+  ShieldAlert,
+  Wallet,
   Layers,
+  BarChart3,
+  CheckCircle2,
+  Calendar,
+  Building2,
+  DollarSign,
 } from 'lucide-react';
 import api from '../../api';
-import StatCard from '../../components/common/StatCard';
-import StatusBadge from '../../components/common/StatusBadge';
 import { formatINR, formatDate } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -31,7 +28,6 @@ import {
 } from 'recharts';
 
 export default function Dashboard() {
-  const navigate = useNavigate();
   const { company } = useAuth();
   const [data, setData] = useState(null);
   const [divisions, setDivisions] = useState([]);
@@ -79,10 +75,16 @@ export default function Dashboard() {
     totalReceived: 0,
     totalOutstanding: 0,
     overdueAmount: 0,
+    totalUnallocatedAdvances: 0,
     activeProjects: 0,
     totalClients: 0,
-    totalInvoices: 0,
-    pendingQuotations: 0,
+  };
+
+  const aging = data?.charts?.agingBuckets || {
+    current: 0,
+    days16to30: 0,
+    days31to60: 0,
+    days60plus: 0,
   };
 
   const collectionRate =
@@ -90,33 +92,31 @@ export default function Dashboard() {
       ? Math.min(100, Math.round((metrics.totalReceived / metrics.totalInvoiced) * 100))
       : 0;
 
-  const isCleanSlate = (metrics.totalClients || 0) === 0 && (metrics.totalInvoices || 0) === 0;
-
   const DIVISION_COLORS = [
     '#14243A', '#233D5B', '#52799D', '#287A57', '#B98232', '#7599BD', '#345275', '#B84B4B', '#697586'
   ];
 
   return (
     <div className="space-y-6 font-sans select-none pb-12">
-      {/* 1. Header with Space Grotesk Title and Geist Controls */}
+      {/* 1. Header with Period & Division Filter Controls (No Shortcuts) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#E2E7ED]">
         <div>
-          <h1 className="text-2xl font-bold text-[#182333] tracking-tight font-display">
-            Dashboard
+          <h1 className="text-xl sm:text-2xl font-bold text-[#182333] tracking-tight font-display">
+            Financial & Operational Intelligence
           </h1>
           <p className="text-xs text-[#697586] mt-0.5 font-sans">
-            Overview of invoicing, payment collections, and receivables
+            Executive cashflow health, division performance & receivables risk monitoring
           </p>
         </div>
 
-        {/* Controls */}
+        {/* Analytical Controls */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Period Selector */}
           <div className="inline-flex items-center p-0.5 bg-[#FFFFFF] rounded-lg border border-[#E2E7ED] text-xs font-sans">
             {[
               { id: 'this_month', label: 'Month' },
               { id: 'this_quarter', label: 'Quarter' },
-              { id: 'this_fy', label: 'Financial Year' },
+              { id: 'this_fy', label: 'FY 2026-27' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -137,155 +137,151 @@ export default function Dashboard() {
             <select
               value={division}
               onChange={(e) => setDivision(e.target.value)}
-              className="appearance-none pl-3 pr-7 py-1.5 bg-[#FFFFFF] border border-[#E2E7ED] rounded-lg text-xs font-sans font-medium text-[#182333] outline-none focus:border-[#52799D] transition-colors cursor-pointer"
+              className="appearance-none pl-3 pr-8 py-1.5 bg-[#FFFFFF] border border-[#E2E7ED] rounded-lg text-xs font-sans font-medium text-[#182333] outline-none focus:border-[#52799D] transition-colors cursor-pointer"
             >
-              <option value="all">All Divisions</option>
+              <option value="all">All 9 Business Divisions</option>
               {divisions.map((d) => (
                 <option key={d._id} value={d._id}>
                   {d.name}
                 </option>
               ))}
             </select>
-            <Filter className="w-3.5 h-3.5 text-[#697586] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
-
-          {/* Action Trigger */}
-          <button
-            onClick={() => navigate('/invoices?create=true')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#52799D] hover:bg-[#233D5B] text-white text-xs font-medium font-sans rounded-lg transition-colors shadow-subtle"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Invoice</span>
-          </button>
         </div>
       </div>
 
-      {/* 2. Critical Warning Banner if past-due invoices exist */}
+      {/* 2. Critical Warning Banner for Overdue Risk */}
       {metrics.overdueAmount > 0 && (
-        <div className="bg-[#FDEFEF] border border-[#F7C6C6] rounded-lg p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="w-4 h-4 text-[#B84B4B] shrink-0" />
-            <span className="text-xs text-[#182333] font-sans">
-              <span className="font-semibold text-[#B84B4B]">Overdue:</span>{' '}
-              <span className="font-financial font-medium">{formatINR(metrics.overdueAmount)}</span> is past due date across client accounts.
-            </span>
-          </div>
-          <button
-            onClick={() => navigate('/reports?type=overdue_invoices')}
-            className="text-xs font-sans font-medium text-[#B84B4B] hover:underline shrink-0"
-          >
-            View overdue invoices →
-          </button>
+        <div className="bg-[#FDEFEF] border border-[#F7C6C6] rounded-lg p-3.5 flex items-center gap-3">
+          <AlertCircle className="w-4 h-4 text-[#B84B4B] shrink-0" />
+          <span className="text-xs text-[#182333] font-sans">
+            <span className="font-semibold text-[#B84B4B]">Aging Risk Alert:</span>{' '}
+            <span className="font-financial font-medium">{formatINR(metrics.overdueAmount)}</span> is past agreed payment terms across client accounts.
+          </span>
         </div>
       )}
 
-      {/* 3. Core Financial Overview: 4 Subtle Cards */}
+      {/* 3. Executive KPI Suite: 4 Primary Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Invoiced */}
+        {/* Cleared Cash Inflow */}
         <div className="bg-white rounded-lg p-5 border border-[#E2E7ED] shadow-subtle">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-[#697586] font-sans">Total Invoiced</span>
-            <FileText className="w-4 h-4 text-[#52799D]" />
-          </div>
-          <div className="text-2xl font-bold text-[#182333] font-financial">
-            {formatINR(metrics.totalInvoiced)}
-          </div>
-          <div className="text-[11px] text-[#697586] mt-1 font-sans">
-            {metrics.totalInvoices} invoice{metrics.totalInvoices === 1 ? '' : 's'} issued
-          </div>
-        </div>
-
-        {/* Total Received */}
-        <div className="bg-white rounded-lg p-5 border border-[#E2E7ED] shadow-subtle">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-[#697586] font-sans">Total Received</span>
+            <span className="text-xs font-medium text-[#697586] font-sans">Realized Cash Collections</span>
             <TrendingUp className="w-4 h-4 text-[#287A57]" />
           </div>
           <div className="text-2xl font-bold text-[#287A57] font-financial">
             {formatINR(metrics.totalReceived)}
           </div>
           <div className="text-[11px] text-[#697586] mt-1 font-sans">
-            {collectionRate}% collection rate
+            {collectionRate}% effective collection rate
           </div>
         </div>
 
-        {/* Total Outstanding */}
+        {/* Net Receivables Balance */}
         <div className="bg-white rounded-lg p-5 border border-[#E2E7ED] shadow-subtle">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-[#697586] font-sans">Outstanding Balance</span>
+            <span className="text-xs font-medium text-[#697586] font-sans">Receivables Outstanding</span>
             <Clock className="w-4 h-4 text-[#B98232]" />
           </div>
           <div className="text-2xl font-bold text-[#B98232] font-financial">
             {formatINR(metrics.totalOutstanding)}
           </div>
           <div className="text-[11px] text-[#697586] mt-1 font-sans">
-            Net receivable due
+            Net pending across accounts
           </div>
         </div>
 
-        {/* Operational Scope */}
+        {/* Unallocated Retainers in Hand */}
         <div className="bg-white rounded-lg p-5 border border-[#E2E7ED] shadow-subtle">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-[#697586] font-sans">Active Overview</span>
+            <span className="text-xs font-medium text-[#697586] font-sans">Advances in Hand</span>
+            <Wallet className="w-4 h-4 text-[#52799D]" />
+          </div>
+          <div className="text-2xl font-bold text-[#52799D] font-financial">
+            {formatINR(metrics.totalUnallocatedAdvances || 0)}
+          </div>
+          <div className="text-[11px] text-[#697586] mt-1 font-sans">
+            Unbilled retainer liquidity
+          </div>
+        </div>
+
+        {/* Operational Portfolio Volume */}
+        <div className="bg-white rounded-lg p-5 border border-[#E2E7ED] shadow-subtle">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-[#697586] font-sans">Active Enterprise Scope</span>
             <Briefcase className="w-4 h-4 text-[#233D5B]" />
           </div>
           <div className="text-2xl font-bold text-[#182333] font-financial">
-            {metrics.activeProjects || 0}
+            {metrics.activeProjects || 0} Projects
           </div>
           <div className="text-[11px] text-[#697586] mt-1 font-sans">
-            {metrics.totalClients || 0} clients • {metrics.pendingQuotations || 0} pending quotes
+            Across {metrics.totalClients || 0} active corporate accounts
           </div>
         </div>
       </div>
 
-      {/* 4. Clean Slate Gentle Guide (When database is empty) */}
-      {isCleanSlate && (
-        <div className="bg-white rounded-lg border border-[#E2E7ED] p-6 shadow-subtle">
-          <div className="max-w-xl">
-            <h2 className="text-base font-semibold text-[#182333] font-display">
-              Ready for operations
-            </h2>
-            <p className="text-xs text-[#697586] mt-1 font-sans">
-              Get started by adding a client or issuing your first invoice. All ledger balances and division metrics will update automatically.
+      {/* 4. Receivables Aging Distribution (Cashflow Risk Breakdown) */}
+      <div className="bg-[#FFFFFF] p-5 rounded-lg border border-[#E2E7ED] shadow-subtle">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-[#182333] font-display">
+              Receivables Aging Analysis
+            </h3>
+            <p className="text-xs text-[#697586] font-sans">
+              Maturity breakdown of outstanding balances across maturity buckets
             </p>
           </div>
+          <span className="text-[11px] font-mono text-[#697586] bg-[#F4F7FA] px-2 py-0.5 rounded border border-[#E2E7ED] self-start sm:self-auto">
+            Statutory Accounting Norms
+          </span>
+        </div>
 
-          <div className="flex flex-wrap gap-2.5 mt-4">
-            <button
-              onClick={() => navigate('/clients?create=true')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#F4F7FA] hover:bg-[#EEF4F8] text-[#182333] text-xs font-medium font-sans rounded-lg border border-[#E2E7ED] transition-colors"
-            >
-              <Users className="w-3.5 h-3.5 text-[#52799D]" />
-              <span>Add Client</span>
-            </button>
-            <button
-              onClick={() => navigate('/projects?create=true')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#F4F7FA] hover:bg-[#EEF4F8] text-[#182333] text-xs font-medium font-sans rounded-lg border border-[#E2E7ED] transition-colors"
-            >
-              <Briefcase className="w-3.5 h-3.5 text-[#233D5B]" />
-              <span>Create Project</span>
-            </button>
-            <button
-              onClick={() => navigate('/invoices?create=true')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#52799D] hover:bg-[#233D5B] text-white text-xs font-medium font-sans rounded-lg transition-colors shadow-subtle"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Create Invoice</span>
-            </button>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="p-3.5 rounded-lg bg-[#F8FAFC] border border-[#E2E7ED]">
+            <span className="text-[11px] font-semibold text-[#287A57] uppercase tracking-wider block">0 – 15 Days (Current)</span>
+            <span className="text-lg font-bold text-[#182333] font-financial mt-1 block">
+              {formatINR(aging.current)}
+            </span>
+            <span className="text-[10px] text-[#697586]">Regular billing window</span>
+          </div>
+
+          <div className="p-3.5 rounded-lg bg-[#F8FAFC] border border-[#E2E7ED]">
+            <span className="text-[11px] font-semibold text-[#52799D] uppercase tracking-wider block">16 – 30 Days</span>
+            <span className="text-lg font-bold text-[#182333] font-financial mt-1 block">
+              {formatINR(aging.days16to30)}
+            </span>
+            <span className="text-[10px] text-[#697586]">Follow-up window</span>
+          </div>
+
+          <div className="p-3.5 rounded-lg bg-[#FFFBEB] border border-[#FDE68A]">
+            <span className="text-[11px] font-semibold text-[#B98232] uppercase tracking-wider block">31 – 60 Days</span>
+            <span className="text-lg font-bold text-[#B98232] font-financial mt-1 block">
+              {formatINR(aging.days31to60)}
+            </span>
+            <span className="text-[10px] text-[#B98232]">Escalated payment review</span>
+          </div>
+
+          <div className="p-3.5 rounded-lg bg-[#FEF2F2] border border-[#FECACA]">
+            <span className="text-[11px] font-semibold text-[#B84B4B] uppercase tracking-wider block">60+ Days (Critical)</span>
+            <span className="text-lg font-bold text-[#B84B4B] font-financial mt-1 block">
+              {formatINR(aging.days60plus)}
+            </span>
+            <span className="text-[10px] text-[#B84B4B]">Requires executive action</span>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* 5. Invoicing Trend & Division Distribution */}
+      {/* 5. Monthly Cash Inflow Trends & Division Revenue Distribution */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Monthly Cashflow Analytics */}
         <div className="lg:col-span-2 bg-[#FFFFFF] p-5 rounded-lg border border-[#E2E7ED] shadow-subtle">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-semibold text-[#182333] font-display">
-                Monthly Invoicing vs Collections
+                Monthly Inflows vs Collections
               </h3>
               <p className="text-xs text-[#697586] font-sans">
-                Billed amounts compared against cleared payments
+                Realized collections tracking compared against historical revenue
               </p>
             </div>
             <span className="text-[11px] font-financial text-[#697586] bg-[#F4F7FA] px-2 py-0.5 rounded border border-[#E2E7ED]">
@@ -293,7 +289,7 @@ export default function Dashboard() {
             </span>
           </div>
 
-          <div className="h-60 w-full pt-1">
+          <div className="h-64 w-full pt-1">
             {data?.charts?.monthlyTrends?.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.charts.monthlyTrends}>
@@ -321,42 +317,41 @@ export default function Dashboard() {
                     }}
                   />
                   <Legend />
-                  <Bar dataKey="invoiced" name="Invoiced" fill="#14243A" radius={[2, 2, 0, 0]} />
-                  <Bar dataKey="received" name="Received" fill="#287A57" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="received" name="Cleared Cash" fill="#287A57" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="invoiced" name="Billed Amount" fill="#14243A" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-xs text-[#697586] font-sans">
-                <span>No monthly transaction data recorded yet.</span>
-                <span className="text-[11px] text-[#697586]/70 mt-1">Data will populate automatically as invoices and payments are recorded</span>
+                <span>No historical transaction data recorded yet.</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Division Breakdown */}
+        {/* 9-Division Contribution Breakdown */}
         <div className="bg-[#FFFFFF] p-5 rounded-lg border border-[#E2E7ED] shadow-subtle flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-sm font-semibold text-[#182333] font-display">
-                Division Revenue
+                Division Contribution
               </h3>
               <span className="text-[11px] font-mono text-[#52799D] font-medium">9 DIVISIONS</span>
             </div>
-            <p className="text-xs text-[#697586] font-sans">Revenue contribution by internal division</p>
+            <p className="text-xs text-[#697586] font-sans">Revenue distribution across Focsera verticals</p>
           </div>
 
           <div className="py-4 flex-1 flex flex-col justify-center">
-            {data?.charts?.divisionBreakup?.length > 0 ? (
-              <div className="space-y-2.5">
-                {data.charts.divisionBreakup.slice(0, 5).map((divItem, idx) => (
+            {data?.charts?.divisionRevenue?.length > 0 ? (
+              <div className="space-y-3">
+                {data.charts.divisionRevenue.slice(0, 6).map((divItem, idx) => (
                   <div key={idx} className="space-y-1">
                     <div className="flex items-center justify-between text-xs font-sans">
-                      <span className="text-[#182333] truncate max-w-[140px] text-xs font-medium">
+                      <span className="text-[#182333] truncate max-w-[150px] text-xs font-medium">
                         {divItem.name}
                       </span>
                       <span className="font-financial font-medium text-[#182333] text-xs">
-                        {formatINR(divItem.value)}
+                        {formatINR(divItem.amount)}
                       </span>
                     </div>
                     <div className="w-full h-1.5 bg-[#EEF4F8] rounded-full overflow-hidden">
@@ -366,7 +361,7 @@ export default function Dashboard() {
                           backgroundColor: DIVISION_COLORS[idx % DIVISION_COLORS.length],
                           width: `${Math.min(
                             100,
-                            Math.round((divItem.value / (metrics.totalInvoiced || 1)) * 100)
+                            Math.round((divItem.amount / (metrics.totalInvoiced || 1)) * 100)
                           )}%`,
                         }}
                       />
@@ -377,130 +372,101 @@ export default function Dashboard() {
             ) : (
               <div className="h-40 flex flex-col items-center justify-center text-xs text-[#697586] font-sans text-center">
                 <Layers className="w-5 h-5 text-[#697586]/60 mb-2" />
-                <span>No division revenue yet</span>
-                <span className="text-[11px] text-[#697586]/70 mt-0.5">Predefined divisions active</span>
+                <span>No division revenue recorded yet</span>
               </div>
             )}
           </div>
 
-          <button
-            onClick={() => navigate('/reports?type=division_revenue')}
-            className="w-full py-2 bg-[#F4F7FA] hover:bg-[#EEF4F8] text-[#182333] text-xs font-sans font-medium rounded-lg border border-[#E2E7ED] transition-colors"
-          >
-            View all divisions →
-          </button>
+          <div className="pt-2 text-center text-[11px] font-mono text-[#697586] border-t border-[#E2E7ED]">
+            Focsera Multi-Division Chart of Accounts
+          </div>
         </div>
       </div>
 
-      {/* 6. Recent Invoices & Recent Collections */}
+      {/* 6. Active Project Milestone Horizon & Client Financial Exposure */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Recent Invoices */}
+        {/* Project Milestone Health */}
         <div className="bg-[#FFFFFF] rounded-lg border border-[#E2E7ED] shadow-subtle p-5">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#E2E7ED]">
-            <div>
-              <h3 className="text-sm font-semibold text-[#182333] font-display">
-                Recent Invoices
-              </h3>
-              <p className="text-xs text-[#697586] font-sans">Latest billing documents</p>
-            </div>
-            <button
-              onClick={() => navigate('/invoices')}
-              className="text-xs font-sans font-medium text-[#52799D] hover:underline"
-            >
-              View all →
-            </button>
+          <div className="mb-3 pb-2 border-b border-[#E2E7ED]">
+            <h3 className="text-sm font-semibold text-[#182333] font-display">
+              Enterprise Project Milestones
+            </h3>
+            <p className="text-xs text-[#697586] font-sans">Active contract values and completion horizon</p>
           </div>
 
           <div className="divide-y divide-[#EEF2F6]">
-            {data?.recent?.invoices?.length > 0 ? (
-              data.recent.invoices.map((inv) => (
-                <div
-                  key={inv._id}
-                  onClick={() => navigate(`/invoices?view=${inv._id}`)}
-                  className="py-2.5 flex items-center justify-between hover:bg-[#F8FAFC] px-2 rounded cursor-pointer transition-colors"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-financial font-medium text-[#182333] text-xs">
-                        {inv.invoiceNumber}
-                      </span>
-                      <StatusBadge status={inv.status} type="invoice" />
+            {data?.projectHealth?.length > 0 ? (
+              data.projectHealth.map((prj) => (
+                <div key={prj._id} className="py-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-[#182333] text-xs">{prj.name}</div>
+                      <div className="text-[11px] text-[#697586] font-sans">
+                        {prj.clientName} • <span className="text-[#52799D] font-medium">{prj.divisionName}</span>
+                      </div>
                     </div>
-                    <div className="text-[11px] text-[#697586] mt-0.5 font-sans">
-                      {inv.client?.name} • {formatDate(inv.invoiceDate)}
+                    <div className="text-right">
+                      <div className="text-xs font-semibold text-[#182333] font-financial">
+                        {formatINR(prj.agreedValue)}
+                      </div>
+                      <div className="text-[10px] text-[#697586] font-sans">
+                        {prj.completedMilestones}/{prj.totalMilestones} Milestones Paid
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs font-semibold text-[#182333] font-financial">
-                      {formatINR(inv.grandTotal)}
-                    </div>
-                    <div className="text-[11px] font-financial text-[#697586]">
-                      Bal: {formatINR(inv.outstandingBalance)}
-                    </div>
+
+                  {/* Progress bar */}
+                  <div className="w-full h-1 bg-[#EEF4F8] rounded-full overflow-hidden mt-2">
+                    <div
+                      className="h-full bg-[#287A57] rounded-full"
+                      style={{ width: `${prj.milestoneProgress}%` }}
+                    />
                   </div>
                 </div>
               ))
             ) : (
               <div className="py-8 text-center text-xs text-[#697586] font-sans">
-                No invoices issued yet.
+                No active projects in progress.
               </div>
             )}
           </div>
         </div>
 
-        {/* Recent Collections */}
+        {/* Top Client Exposure & Liquidity Concentration */}
         <div className="bg-[#FFFFFF] rounded-lg border border-[#E2E7ED] shadow-subtle p-5">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#E2E7ED]">
-            <div>
-              <h3 className="text-sm font-semibold text-[#182333] font-display">
-                Recent Collections
-              </h3>
-              <p className="text-xs text-[#697586] font-sans">Cleared receipts and settlements</p>
-            </div>
-            <button
-              onClick={() => navigate('/payments')}
-              className="text-xs font-sans font-medium text-[#52799D] hover:underline"
-            >
-              View all →
-            </button>
+          <div className="mb-3 pb-2 border-b border-[#E2E7ED]">
+            <h3 className="text-sm font-semibold text-[#182333] font-display">
+              Client Account Exposure
+            </h3>
+            <p className="text-xs text-[#697586] font-sans">Concentration of contracted revenue & pending balances</p>
           </div>
 
           <div className="divide-y divide-[#EEF2F6]">
-            {data?.recent?.payments?.length > 0 ? (
-              data.recent.payments.map((p) => (
-                <div
-                  key={p._id}
-                  onClick={() =>
-                    p.receipt && navigate(`/payments?receipt=${p.receipt._id || p.receipt}`)
-                  }
-                  className="py-2.5 flex items-center justify-between hover:bg-[#F8FAFC] px-2 rounded cursor-pointer transition-colors"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-financial font-medium text-[#182333] text-xs">
-                        {p.paymentNumber}
-                      </span>
-                      <span className="px-1.5 py-0.5 bg-[#E9F5EF] text-[#287A57] border border-[#BBE2CF] rounded text-[10px] font-sans font-medium">
-                        {p.paymentMethod}
-                      </span>
+            {data?.topClientExposures?.length > 0 ? (
+              data.topClientExposures.map((cl, idx) => (
+                <div key={idx} className="py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded bg-[#F4F7FA] border border-[#E2E7ED] flex items-center justify-center font-bold text-[11px] text-[#52799D]">
+                      {cl.name.charAt(0)}
                     </div>
-                    <div className="text-[11px] text-[#697586] mt-0.5 font-sans">
-                      {p.client?.name} • {formatDate(p.paymentDate)}
+                    <div>
+                      <div className="text-xs font-medium text-[#182333]">{cl.name}</div>
+                      <div className="text-[11px] text-[#697586]">
+                        Total Contracted: <span className="font-financial">{formatINR(cl.billed)}</span>
+                      </div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs font-semibold text-[#287A57] font-financial">
-                      +{formatINR(p.amount)}
+                    <div className="text-xs font-semibold font-financial text-[#B98232]">
+                      {formatINR(cl.balanceDue)}
                     </div>
-                    <div className="text-[10px] text-[#697586] font-financial">
-                      {p.referenceNumber || 'Direct'}
-                    </div>
+                    <div className="text-[10px] text-[#697586]">Balance Due</div>
                   </div>
                 </div>
               ))
             ) : (
               <div className="py-8 text-center text-xs text-[#697586] font-sans">
-                No payment receipts recorded yet.
+                No client concentration data recorded yet.
               </div>
             )}
           </div>

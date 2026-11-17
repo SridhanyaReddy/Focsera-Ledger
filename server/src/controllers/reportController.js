@@ -142,13 +142,72 @@ export async function getDashboardData(req, res) {
 
     const divisionRevenue = Object.values(divisionRevenueMap).filter((d) => d.amount > 0);
 
-    // 4. Recent Activities
-    const [recentInvoices, recentPayments, recentQuotations, recentProjects] = await Promise.all([
-      Invoice.find(invFilter).populate('client project division').sort({ invoiceDate: -1, createdAt: -1 }).limit(5),
-      Payment.find(payFilter).populate('client invoice project').sort({ paymentDate: -1, createdAt: -1 }).limit(5),
-      Quotation.find(quoFilter).populate('client division').sort({ quotationDate: -1, createdAt: -1 }).limit(5),
-      Project.find(prjFilter).populate('client division').sort({ createdAt: -1 }).limit(5),
-    ]);
+    // 4. Aging of Receivables Analysis (0-15, 16-30, 31-60, 60+ days)
+    const agingBuckets = { current: 0, days16to30: 0, days31to60: 0, days60plus: 0 };
+    invoices.forEach((inv) => {
+      if (inv.outstandingBalance > 0 && inv.dueDate) {
+        const diffDays = Math.floor((now - new Date(inv.dueDate)) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 0) {
+          agingBuckets.current = round(agingBuckets.current + inv.outstandingBalance);
+        } else if (diffDays <= 15) {
+          agingBuckets.current = round(agingBuckets.current + inv.outstandingBalance);
+        } else if (diffDays <= 30) {
+          agingBuckets.days16to30 = round(agingBuckets.days16to30 + inv.outstandingBalance);
+        } else if (diffDays <= 60) {
+          agingBuckets.days31to60 = round(agingBuckets.days31to60 + inv.outstandingBalance);
+        } else {
+          agingBuckets.days60plus = round(agingBuckets.days60plus + inv.outstandingBalance);
+        }
+      }
+    });
+
+    // 5. Unallocated Advances in Hand
+    const advancePayments = await Payment.find({
+      isReversed: false,
+      unallocatedAmount: { $gt: 0 },
+    });
+    const totalUnallocatedAdvances = round(
+      advancePayments.reduce((acc, p) => acc + (p.unallocatedAmount || 0), 0)
+    );
+
+    // 6. Project Milestone Health & Top Projects by Scale
+    const activeProjects = await Project.find({ isArchived: false, status: { $in: ['In Progress', 'Approved'] } })
+      .populate('client division')
+      .sort({ agreedProjectValue: -1 })
+      .limit(6);
+
+    const projectHealth = activeProjects.map((prj) => {
+      const totalMilestones = prj.milestones?.length || 0;
+      const completedMilestones = prj.milestones?.filter((m) => m.status === 'Paid').length || 0;
+      return {
+        _id: prj._id,
+        name: prj.name,
+        clientName: prj.client?.name || 'Client',
+        divisionName: prj.division?.name || 'General',
+        agreedValue: prj.agreedProjectValue || 0,
+        status: prj.status,
+        milestoneProgress: totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0,
+        totalMilestones,
+        completedMilestones,
+      };
+    });
+
+    // 7. Top Clients by Financial Exposure
+    const clientExposureMap = {};
+    invoices.forEach((inv) => {
+      const cId = inv.client?._id?.toString() || inv.client?.toString();
+      const cName = inv.client?.name || 'Corporate Account';
+      if (cId) {
+        if (!clientExposureMap[cId]) {
+          clientExposureMap[cId] = { name: cName, billed: 0, balanceDue: 0 };
+        }
+        clientExposureMap[cId].billed = round(clientExposureMap[cId].billed + inv.grandTotal);
+        clientExposureMap[cId].balanceDue = round(clientExposureMap[cId].balanceDue + (inv.outstandingBalance || 0));
+      }
+    });
+    const topClientExposures = Object.values(clientExposureMap)
+      .sort((a, b) => b.billed - a.billed)
+      .slice(0, 5);
 
     return res.json({
       success: true,
@@ -158,6 +217,7 @@ export async function getDashboardData(req, res) {
           totalReceived,
           totalOutstanding,
           overdueAmount,
+          totalUnallocatedAdvances,
           activeProjects: activeProjectsCount,
           totalClients: clientsCount,
           totalInvoices: invoices.length,
@@ -166,17 +226,18 @@ export async function getDashboardData(req, res) {
         charts: {
           monthlyTrends,
           divisionRevenue,
+          agingBuckets,
           outstandingVsReceived: [
             { name: 'Received', value: totalReceived },
             { name: 'Outstanding', value: totalOutstanding },
           ],
         },
+        topClientExposures,
+        projectHealth,
         recent: {
-          invoices: recentInvoices,
           payments: recentPayments,
-          quotations: recentQuotations,
           projects: recentProjects,
-          overdueInvoices: overdueInvoices.slice(0, 5),
+          invoices: recentInvoices,
         },
       },
     });
