@@ -285,7 +285,7 @@ export async function getDashboardData(req, res) {
           totalOutstanding,
           overdueAmount,
           collectionRate: totalInvoiced > 0 ? Math.min(100, Math.round((totalReceived / totalInvoiced) * 100)) : 0,
-          recentInvoices: recentInvoices.slice(0, 4),
+          recentInvoices: invoices.slice(0, 4),
         },
       },
     });
