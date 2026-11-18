@@ -1,32 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import {
   Briefcase,
-  Users,
-  CheckCircle2,
+  Layers,
   Calendar,
   Clock,
-  Layers,
-  FileText,
-  CreditCard,
-  Building2,
+  CheckCircle2,
   AlertCircle,
-  Phone,
-  Mail,
+  FileText,
+  Building2,
   ChevronRight,
   TrendingUp,
+  PieChart as PieIcon,
+  Activity,
+  Milestone,
 } from 'lucide-react';
 import api from '../../api';
 import { formatINR, formatDate } from '../../utils/formatters';
-import { useAuth } from '../../context/AuthContext';
 
 export default function Dashboard() {
-  const { company } = useAuth();
   const [data, setData] = useState(null);
   const [divisions, setDivisions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filter States
   const [division, setDivision] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     fetchDivisions();
@@ -59,31 +57,46 @@ export default function Dashboard() {
   };
 
   const metrics = data?.metrics || {
+    totalProjects: 0,
     activeProjects: 0,
-    totalClients: 0,
-    totalInvoices: 0,
-    pendingQuotations: 0,
+    completedProjects: 0,
+    onHoldProjects: 0,
+    totalContractValue: 0,
+    milestoneCompletionRate: 0,
+    totalMilestonesCount: 0,
+    completedMilestonesCount: 0,
+  };
+
+  const projectAnalysis = data?.projectAnalysis || {
+    statusCounts: {},
+    detailedProjects: [],
+    divisionProjects: [],
+  };
+
+  const revenueSummary = data?.revenueSummary || {
     totalInvoiced: 0,
     totalReceived: 0,
     totalOutstanding: 0,
+    overdueAmount: 0,
+    collectionRate: 0,
+    recentInvoices: [],
   };
 
-  const projectHealth = data?.projectHealth || [];
-  const recentClients = data?.recentClients || [];
-  const upcomingFollowups = data?.upcomingFollowups || [];
-  const pendingTodos = data?.pendingTodos || [];
-  const recentInvoices = data?.recent?.invoices || [];
+  const filteredProjects = projectAnalysis.detailedProjects.filter((p) => {
+    if (statusFilter === 'all') return true;
+    return p.status === statusFilter;
+  });
 
   return (
     <div className="space-y-6 font-sans select-none pb-12">
-      {/* 1. Header with Operational Focus & Division Filter (No Shortcuts) */}
+      {/* 1. Header (Only Projects Focused, Zero Shortcuts) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#E2E7ED]">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-[#182333] tracking-tight font-display">
-            Operations & Engagements Overview
+            Project Operations & Delivery Intelligence
           </h1>
           <p className="text-xs text-[#697586] mt-0.5 font-sans">
-            Client accounts, enterprise project milestones, meetings & operational delivery
+            Enterprise project pipeline, milestone completion tracking, and division capacity analysis
           </p>
         </div>
 
@@ -104,12 +117,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 2. Primary Operational KPI Cards (Top Priority: Projects & Clients) */}
+      {/* 2. Project Health & Scale Metrics (Top Overview) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Active Projects */}
+        {/* Total Active Contracts */}
         <div className="bg-white rounded-lg p-5 border border-[#E2E7ED] shadow-subtle">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-[#697586]">Active Projects</span>
+            <span className="text-xs font-medium text-[#697586]">Active Engagements</span>
             <div className="w-8 h-8 rounded bg-[#F4F7FA] border border-[#E2E7ED] flex items-center justify-center text-[#233D5B]">
               <Briefcase className="w-4 h-4" />
             </div>
@@ -118,220 +131,247 @@ export default function Dashboard() {
             {metrics.activeProjects}
           </div>
           <div className="text-[11px] text-[#697586] mt-1 font-sans">
-            In progress & scheduled
+            Out of {metrics.totalProjects} total initiated
           </div>
         </div>
 
-        {/* Total Corporate Clients */}
+        {/* Total Contracted Project Value */}
         <div className="bg-white rounded-lg p-5 border border-[#E2E7ED] shadow-subtle">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-[#697586]">Client Portfolio</span>
+            <span className="text-xs font-medium text-[#697586]">Contracted Portfolio</span>
             <div className="w-8 h-8 rounded bg-[#F4F7FA] border border-[#E2E7ED] flex items-center justify-center text-[#52799D]">
-              <Users className="w-4 h-4" />
+              <Activity className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-[#182333] font-financial">
-            {metrics.totalClients}
+          <div className="text-2xl font-bold text-[#52799D] font-financial">
+            {formatINR(metrics.totalContractValue)}
           </div>
           <div className="text-[11px] text-[#697586] mt-1 font-sans">
-            Active client accounts
+            Total committed engagement value
           </div>
         </div>
 
-        {/* Scheduled Follow-ups & Meetings */}
+        {/* Milestone Completion Rate */}
         <div className="bg-white rounded-lg p-5 border border-[#E2E7ED] shadow-subtle">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-[#697586]">Follow-ups & Reviews</span>
-            <div className="w-8 h-8 rounded bg-[#F4F7FA] border border-[#E2E7ED] flex items-center justify-center text-[#B98232]">
-              <Calendar className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-[#B98232] font-financial">
-            {upcomingFollowups.length}
-          </div>
-          <div className="text-[11px] text-[#697586] mt-1 font-sans">
-            Scheduled client sessions
-          </div>
-        </div>
-
-        {/* Pending Tasks */}
-        <div className="bg-white rounded-lg p-5 border border-[#E2E7ED] shadow-subtle">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-[#697586]">Pending Action Tasks</span>
+            <span className="text-xs font-medium text-[#697586]">Milestone Velocity</span>
             <div className="w-8 h-8 rounded bg-[#F4F7FA] border border-[#E2E7ED] flex items-center justify-center text-[#287A57]">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
           <div className="text-2xl font-bold text-[#287A57] font-financial">
-            {pendingTodos.length}
+            {metrics.milestoneCompletionRate}%
           </div>
           <div className="text-[11px] text-[#697586] mt-1 font-sans">
-            Operational deliverables
+            {metrics.completedMilestonesCount}/{metrics.totalMilestonesCount} milestones delivered
+          </div>
+        </div>
+
+        {/* Completed Delivery */}
+        <div className="bg-white rounded-lg p-5 border border-[#E2E7ED] shadow-subtle">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-[#697586]">Delivery Status</span>
+            <div className="w-8 h-8 rounded bg-[#F4F7FA] border border-[#E2E7ED] flex items-center justify-center text-[#B98232]">
+              <Milestone className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-[#182333] font-financial">
+            {metrics.completedProjects} Completed
+          </div>
+          <div className="text-[11px] text-[#697586] mt-1 font-sans">
+            {metrics.onHoldProjects > 0 ? `${metrics.onHoldProjects} on hold` : 'All projects on schedule'}
           </div>
         </div>
       </div>
 
-      {/* 3. Priority Row 1: Active Project Milestones & Progress (High Priority) */}
-      <div className="bg-[#FFFFFF] rounded-lg border border-[#E2E7ED] shadow-subtle p-5">
-        <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#E2E7ED]">
+      {/* 3. Division Project Capacity & Status Distribution Analysis */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Project Pipeline by Status */}
+        <div className="bg-white rounded-lg border border-[#E2E7ED] shadow-subtle p-5">
+          <div className="mb-4 pb-2 border-b border-[#E2E7ED]">
+            <h3 className="text-sm font-semibold text-[#182333] font-display">
+              Pipeline Stage Breakdown
+            </h3>
+            <p className="text-xs text-[#697586] font-sans">Active contract lifecycle distribution</p>
+          </div>
+
+          <div className="space-y-3">
+            {[
+              { label: 'In Progress', count: projectAnalysis.statusCounts['In Progress'] || 0, color: 'bg-[#287A57]' },
+              { label: 'Approved', count: projectAnalysis.statusCounts['Approved'] || 0, color: 'bg-[#52799D]' },
+              { label: 'Completed', count: projectAnalysis.statusCounts['Completed'] || 0, color: 'bg-[#233D5B]' },
+              { label: 'Quotation Sent', count: projectAnalysis.statusCounts['Quotation Sent'] || 0, color: 'bg-[#B98232]' },
+              { label: 'On Hold', count: projectAnalysis.statusCounts['On Hold'] || 0, color: 'bg-[#B84B4B]' },
+            ].map((stage, idx) => {
+              const pct = metrics.totalProjects > 0 ? Math.round((stage.count / metrics.totalProjects) * 100) : 0;
+              return (
+                <div key={idx} className="space-y-1">
+                  <div className="flex justify-between text-xs font-sans">
+                    <span className="text-[#182333] font-medium">{stage.label}</span>
+                    <span className="text-[#697586] font-mono">{stage.count} ({pct}%)</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-[#EEF4F8] rounded-full overflow-hidden">
+                    <div className={`h-full ${stage.color} rounded-full`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Division Engagement & Scale Distribution */}
+        <div className="lg:col-span-2 bg-white rounded-lg border border-[#E2E7ED] shadow-subtle p-5">
+          <div className="mb-4 pb-2 border-b border-[#E2E7ED]">
+            <h3 className="text-sm font-semibold text-[#182333] font-display">
+              Division Project Allocation & Portfolio Scale
+            </h3>
+            <p className="text-xs text-[#697586] font-sans">
+              Contract value distribution across Focsera's 9 business verticals
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {projectAnalysis.divisionProjects.length > 0 ? (
+              projectAnalysis.divisionProjects.map((div, idx) => (
+                <div key={idx} className="p-3 rounded-lg bg-[#F8FAFC] border border-[#E2E7ED] flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-[#182333] block truncate max-w-[160px]">
+                      {div.name}
+                    </span>
+                    <span className="text-[11px] text-[#697586]">
+                      {div.count} active project{div.count === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-financial font-medium text-xs text-[#52799D] block">
+                      {formatINR(div.totalValue)}
+                    </span>
+                    <span className="text-[10px] text-[#697586]">Committed</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full py-8 text-center text-xs text-[#697586]">
+                No division projects currently allocated.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Detailed Project Execution & Milestone Horizon Table */}
+      <div className="bg-white rounded-lg border border-[#E2E7ED] shadow-subtle overflow-hidden">
+        <div className="p-4 border-b border-[#E2E7ED] bg-[#F8FAFC] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-[#182333] font-display">
-              Active Project Engagements & Milestone Progress
+              Enterprise Project Portfolio & Milestone Tracking
             </h3>
             <p className="text-xs text-[#697586] font-sans">
-              Ongoing contracts, division assignments, and delivery execution status
-            </p>
-          </div>
-          <span className="text-[11px] font-mono text-[#52799D] font-medium bg-[#F4F7FA] px-2.5 py-1 rounded border border-[#E2E7ED]">
-            {projectHealth.length} Active Engagements
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projectHealth.length > 0 ? (
-            projectHealth.map((prj) => (
-              <div key={prj._id} className="p-4 rounded-lg bg-[#F8FAFC] border border-[#E2E7ED] flex flex-col justify-between">
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="font-semibold text-[#182333] text-xs leading-snug line-clamp-1">
-                      {prj.name}
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[#EEF4F8] text-[#52799D] border border-[#DCE7F0] shrink-0">
-                      {prj.status}
-                    </span>
-                  </div>
-
-                  <div className="text-[11px] text-[#697586] mt-1.5 flex items-center gap-1.5">
-                    <Building2 className="w-3 h-3 text-[#697586]" />
-                    <span className="truncate">{prj.clientName}</span>
-                  </div>
-
-                  <div className="text-[11px] text-[#52799D] font-medium mt-1 flex items-center gap-1.5">
-                    <Layers className="w-3 h-3 text-[#52799D]" />
-                    <span>{prj.divisionName}</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-[#E2E7ED]">
-                  <div className="flex items-center justify-between text-[11px] font-sans mb-1.5">
-                    <span className="text-[#697586]">Milestone Execution</span>
-                    <span className="font-medium text-[#182333] font-financial">
-                      {prj.completedMilestones}/{prj.totalMilestones} Cleared ({prj.milestoneProgress}%)
-                    </span>
-                  </div>
-                  <div className="w-full h-1.5 bg-[#E2E7ED] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#287A57] rounded-full transition-all duration-300"
-                      style={{ width: `${prj.milestoneProgress}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="col-span-full py-8 text-center text-xs text-[#697586]">
-              No active project engagements.
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 4. Priority Row 2: Client Accounts & Operational Pipeline */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Recent Client Accounts */}
-        <div className="bg-[#FFFFFF] rounded-lg border border-[#E2E7ED] shadow-subtle p-5">
-          <div className="mb-3 pb-2 border-b border-[#E2E7ED]">
-            <h3 className="text-sm font-semibold text-[#182333] font-display">
-              Client Portfolio & Corporate Accounts
-            </h3>
-            <p className="text-xs text-[#697586] font-sans">
-              Recently onboarded clients, organization contacts & billing profiles
+              In-depth execution health, client accounts, timeline, and upcoming deliverables
             </p>
           </div>
 
-          <div className="divide-y divide-[#EEF2F6]">
-            {recentClients.length > 0 ? (
-              recentClients.map((client) => (
-                <div key={client._id} className="py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded bg-[#F4F7FA] border border-[#E2E7ED] flex items-center justify-center font-bold text-xs text-[#52799D] shrink-0">
-                      {client.name.charAt(0)}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-medium text-[#182333] truncate">
-                        {client.name}
-                        {client.businessName && (
-                          <span className="text-[#697586] font-normal ml-1">({client.businessName})</span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-[#697586] flex items-center gap-2 mt-0.5 font-mono">
-                        <span>{client.clientId}</span>
-                        <span>•</span>
-                        <span>{client.phone}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <span className="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-[#F4F7FA] text-[#697586] border border-[#E2E7ED] shrink-0">
-                    {client.clientType || 'Corporate'}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="py-8 text-center text-xs text-[#697586]">
-                No client profiles found.
-              </div>
-            )}
+          {/* Filter by Status */}
+          <div className="inline-flex items-center gap-1.5">
+            <span className="text-[11px] text-[#697586]">Filter Stage:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2.5 py-1 bg-white border border-[#E2E7ED] rounded text-xs text-[#182333] outline-none"
+            >
+              <option value="all">All Stages</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Approved">Approved</option>
+              <option value="Completed">Completed</option>
+              <option value="On Hold">On Hold</option>
+            </select>
           </div>
         </div>
 
-        {/* Operational Follow-ups & Scheduled Reviews */}
-        <div className="bg-[#FFFFFF] rounded-lg border border-[#E2E7ED] shadow-subtle p-5">
-          <div className="mb-3 pb-2 border-b border-[#E2E7ED]">
-            <h3 className="text-sm font-semibold text-[#182333] font-display">
-              Upcoming Follow-ups & Milestone Reviews
-            </h3>
-            <p className="text-xs text-[#697586] font-sans">
-              Client consultations, milestone review meetings & next actions
-            </p>
-          </div>
-
-          <div className="divide-y divide-[#EEF2F6]">
-            {upcomingFollowups.length > 0 ? (
-              upcomingFollowups.map((f) => (
-                <div key={f._id} className="py-3 flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-medium text-[#182333] flex items-center gap-2">
-                      <span>{f.title}</span>
-                      <span className="px-1.5 py-0.2 bg-[#F4F7FA] border border-[#E2E7ED] rounded text-[10px] font-mono text-[#52799D]">
-                        {f.type}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs font-sans">
+            <thead>
+              <tr className="bg-[#FFFFFF] border-b border-[#E2E7ED] text-[#697586] uppercase font-semibold text-[10px] tracking-wider">
+                <th className="py-3 px-4">Project ID & Name</th>
+                <th className="py-3 px-4">Client</th>
+                <th className="py-3 px-4">Division</th>
+                <th className="py-3 px-4 text-right">Agreed Value</th>
+                <th className="py-3 px-4">Milestone Progress</th>
+                <th className="py-3 px-4">Next Deliverable</th>
+                <th className="py-3 px-4 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#EEF2F6]">
+              {filteredProjects.length > 0 ? (
+                filteredProjects.map((prj) => (
+                  <tr key={prj._id} className="hover:bg-[#F8FAFC] transition-colors">
+                    <td className="py-3 px-4">
+                      <div className="font-semibold text-[#182333] text-xs">{prj.name}</div>
+                      <div className="text-[10px] font-mono text-[#697586]">{prj.projectId}</div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="text-[#182333] font-medium">{prj.client?.name || 'Client Account'}</div>
+                      {prj.client?.businessName && (
+                        <div className="text-[10px] text-[#697586]">{prj.client.businessName}</div>
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="px-2 py-0.5 rounded bg-[#EEF4F8] text-[#52799D] font-medium text-[10px] border border-[#DCE7F0]">
+                        {prj.division?.name || 'General'}
                       </span>
-                    </div>
-                    <div className="text-[11px] text-[#697586] mt-0.5">
-                      Project: <span className="font-medium text-[#182333]">{f.project?.name || 'General'}</span>
-                    </div>
-                    <p className="text-[11px] text-[#697586] italic mt-1 line-clamp-1">
-                      "{f.notes}"
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-[10px] font-mono text-[#697586] bg-[#F8FAFC] px-2 py-1 rounded border border-[#E2E7ED] block">
-                      {formatDate(f.meetingDate)}
-                    </span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="py-8 text-center text-xs text-[#697586]">
-                No pending meetings or reviews scheduled.
-              </div>
-            )}
-          </div>
+                    </td>
+                    <td className="py-3 px-4 text-right font-financial font-medium text-[#182333]">
+                      {formatINR(prj.agreedProjectValue)}
+                    </td>
+                    <td className="py-3 px-4 min-w-[160px]">
+                      <div className="flex justify-between text-[10px] mb-1">
+                        <span className="text-[#697586]">
+                          {prj.milestonesPaid}/{prj.milestonesCount} Paid
+                        </span>
+                        <span className="font-medium text-[#182333] font-financial">{prj.progress}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-[#EEF4F8] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#287A57] rounded-full"
+                          style={{ width: `${prj.progress}%` }}
+                        />
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      {prj.nextMilestone ? (
+                        <div>
+                          <span className="font-medium text-[#182333] block truncate max-w-[150px]">
+                            {prj.nextMilestone.name}
+                          </span>
+                          <span className="text-[10px] text-[#697586] font-financial">
+                            {formatINR(prj.nextMilestone.amount)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[#697586] text-[11px] italic">Completed</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[#F4F7FA] text-[#182333] border border-[#E2E7ED]">
+                        {prj.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="7" className="py-8 text-center text-xs text-[#697586]">
+                    No projects found for the selected filter.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* 5. Lowest Priority Section: Invoices & Revenue Summary (Placed at the very bottom) */}
-      <div className="pt-2 border-t border-[#E2E7ED]">
+      {/* 5. Lowest Priority: Financial & Revenue Snapshot (At the Very Bottom) */}
+      <div className="pt-4 border-t border-[#E2E7ED]">
         <div className="flex items-center gap-2 mb-3">
           <FileText className="w-4 h-4 text-[#697586]" />
           <h3 className="text-xs font-semibold text-[#697586] uppercase tracking-wider font-mono">
@@ -339,52 +379,33 @@ export default function Dashboard() {
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Recent Invoices Table (Compact, Low Priority) */}
-          <div className="lg:col-span-2 bg-white rounded-lg border border-[#E2E7ED] p-4 shadow-subtle">
-            <span className="text-xs font-medium text-[#182333] block mb-2">Recent Invoicing Records</span>
-            <div className="divide-y divide-[#EEF2F6]">
-              {recentInvoices.length > 0 ? (
-                recentInvoices.map((inv) => (
-                  <div key={inv._id} className="py-2.5 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="font-financial font-medium text-[#182333]">{inv.invoiceNumber}</span>
-                      <span className="text-[#697586] ml-2 text-[11px]">{inv.client?.name}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-financial font-medium text-[#182333]">{formatINR(inv.grandTotal)}</span>
-                      <span className="text-[10px] ml-2 px-1.5 py-0.5 rounded bg-[#F4F7FA] text-[#697586] border border-[#E2E7ED]">
-                        {inv.status}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="py-4 text-center text-xs text-[#697586]">No invoices recorded.</div>
-              )}
-            </div>
+        <div className="bg-white rounded-lg border border-[#E2E7ED] p-4 shadow-subtle grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-3 bg-[#F8FAFC] rounded border border-[#E2E7ED]">
+            <span className="text-[11px] text-[#697586] block">Total Invoiced</span>
+            <span className="text-base font-bold text-[#182333] font-financial mt-0.5 block">
+              {formatINR(revenueSummary.totalInvoiced)}
+            </span>
           </div>
 
-          {/* Revenue Totals (Minimized) */}
-          <div className="bg-white rounded-lg border border-[#E2E7ED] p-4 shadow-subtle flex flex-col justify-between">
-            <span className="text-xs font-medium text-[#182333] block">Revenue Summary</span>
-            <div className="space-y-3 py-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-[#697586]">Total Invoiced</span>
-                <span className="font-financial font-medium text-[#182333]">{formatINR(metrics.totalInvoiced)}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-[#697586]">Cleared Collections</span>
-                <span className="font-financial font-medium text-[#287A57]">{formatINR(metrics.totalReceived)}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-[#697586]">Outstanding Receivables</span>
-                <span className="font-financial font-medium text-[#B98232]">{formatINR(metrics.totalOutstanding)}</span>
-              </div>
-            </div>
-            <div className="text-[10px] text-[#697586] text-center pt-2 border-t border-[#EEF2F6]">
-              Financial year totals
-            </div>
+          <div className="p-3 bg-[#F8FAFC] rounded border border-[#E2E7ED]">
+            <span className="text-[11px] text-[#697586] block">Cleared Collections</span>
+            <span className="text-base font-bold text-[#287A57] font-financial mt-0.5 block">
+              {formatINR(revenueSummary.totalReceived)}
+            </span>
+          </div>
+
+          <div className="p-3 bg-[#F8FAFC] rounded border border-[#E2E7ED]">
+            <span className="text-[11px] text-[#697586] block">Outstanding Receivables</span>
+            <span className="text-base font-bold text-[#B98232] font-financial mt-0.5 block">
+              {formatINR(revenueSummary.totalOutstanding)}
+            </span>
+          </div>
+
+          <div className="p-3 bg-[#F8FAFC] rounded border border-[#E2E7ED]">
+            <span className="text-[11px] text-[#697586] block">Collection Efficiency</span>
+            <span className="text-base font-bold text-[#52799D] font-financial mt-0.5 block">
+              {revenueSummary.collectionRate}%
+            </span>
           </div>
         </div>
       </div>

@@ -172,105 +172,120 @@ export async function getDashboardData(req, res) {
       advancePayments.reduce((acc, p) => acc + (p.unallocatedAmount || 0), 0)
     );
 
-    // 6. Project Milestone Health & Top Projects by Scale
-    const activeProjects = await Project.find({ isArchived: false, status: { $in: ['In Progress', 'Approved'] } })
-      .populate('client division')
-      .sort({ agreedProjectValue: -1 })
-      .limit(6);
+    // 6. Comprehensive Projects Analytics Suite
+    const allProjects = await Project.find({ isArchived: false, ...(division && division !== 'all' ? { division } : {}) })
+      .populate('client', 'name businessName phone clientId')
+      .populate('division', 'name code category')
+      .sort({ createdAt: -1 })
+      .lean();
 
-    const projectHealth = activeProjects.map((prj) => {
-      const totalMilestones = prj.milestones?.length || 0;
-      const completedMilestones = prj.milestones?.filter((m) => m.status === 'Paid').length || 0;
+    // Grouping by status
+    const statusCounts = {
+      'In Progress': 0,
+      'Approved': 0,
+      'Enquiry': 0,
+      'Quotation Sent': 0,
+      'On Hold': 0,
+      'Completed': 0,
+      'Cancelled': 0,
+    };
+
+    let totalContractValue = 0;
+    let completedMilestonesCount = 0;
+    let totalMilestonesCount = 0;
+
+    const detailedProjects = allProjects.map((prj) => {
+      if (statusCounts[prj.status] !== undefined) {
+        statusCounts[prj.status]++;
+      } else {
+        statusCounts[prj.status] = 1;
+      }
+
+      totalContractValue = round(totalContractValue + (prj.agreedProjectValue || 0));
+
+      const milestones = prj.milestones || [];
+      const mTotal = milestones.length;
+      const mPaid = milestones.filter((m) => m.status === 'Paid').length;
+      const mInvoiced = milestones.filter((m) => m.status === 'Invoiced').length;
+      const mPending = milestones.filter((m) => m.status === 'Pending').length;
+
+      completedMilestonesCount += mPaid;
+      totalMilestonesCount += mTotal;
+
+      const progress = mTotal > 0 ? Math.round((mPaid / mTotal) * 100) : (prj.status === 'Completed' ? 100 : 0);
+
+      // Find upcoming milestone
+      const nextMilestone = milestones.find((m) => m.status === 'Pending' || m.status === 'Invoiced') || null;
+
       return {
         _id: prj._id,
+        projectId: prj.projectId,
         name: prj.name,
-        clientName: prj.client?.name || 'Client',
-        divisionName: prj.division?.name || 'General',
-        agreedValue: prj.agreedProjectValue || 0,
+        client: prj.client,
+        division: prj.division,
+        serviceCategory: prj.serviceCategory || 'Turnkey Project',
+        startDate: prj.startDate,
+        expectedCompletionDate: prj.expectedCompletionDate,
+        agreedProjectValue: prj.agreedProjectValue || 0,
         status: prj.status,
-        milestoneProgress: totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0,
-        totalMilestones,
-        completedMilestones,
+        milestonesCount: mTotal,
+        milestonesPaid: mPaid,
+        milestonesInvoiced: mInvoiced,
+        milestonesPending: mPending,
+        progress,
+        nextMilestone: nextMilestone ? {
+          name: nextMilestone.name,
+          amount: nextMilestone.amount,
+          dueDate: nextMilestone.dueDate,
+          status: nextMilestone.status,
+        } : null,
       };
     });
 
-    // 7. Top Clients by Financial Exposure
-    const clientExposureMap = {};
-    invoices.forEach((inv) => {
-      const cId = inv.client?._id?.toString() || inv.client?.toString();
-      const cName = inv.client?.name || 'Corporate Account';
-      if (cId) {
-        if (!clientExposureMap[cId]) {
-          clientExposureMap[cId] = { name: cName, billed: 0, balanceDue: 0 };
-        }
-        clientExposureMap[cId].billed = round(clientExposureMap[cId].billed + inv.grandTotal);
-        clientExposureMap[cId].balanceDue = round(clientExposureMap[cId].balanceDue + (inv.outstandingBalance || 0));
+    // Division project distribution
+    const divisionProjectMap = {};
+    allDivisions.forEach((d) => {
+      divisionProjectMap[d._id.toString()] = { name: d.name, code: d.code, count: 0, totalValue: 0 };
+    });
+    allProjects.forEach((prj) => {
+      const dId = prj.division?._id?.toString() || prj.division?.toString();
+      if (dId && divisionProjectMap[dId]) {
+        divisionProjectMap[dId].count++;
+        divisionProjectMap[dId].totalValue = round(divisionProjectMap[dId].totalValue + (prj.agreedProjectValue || 0));
       }
     });
-    const topClientExposures = Object.values(clientExposureMap)
-      .sort((a, b) => b.billed - a.billed)
-      .slice(0, 5);
-
-    // 7. Client Portfolio Insights (Total, Business vs Individual, Recent Clients)
-    const [recentClientsList, clientTypeStats] = await Promise.all([
-      Client.find({ isArchived: false }).sort({ createdAt: -1 }).limit(6).lean(),
-      Client.aggregate([
-        { $match: { isArchived: false } },
-        { $group: { _id: '$clientType', count: { $sum: 1 } } },
-      ]),
-    ]);
-
-    // 8. Operational Follow-ups & Priority Tasks
-    const [upcomingFollowups, pendingTodos] = await Promise.all([
-      FollowUp.find({ status: { $ne: 'Completed' } })
-        .populate('project', 'name projectId')
-        .populate('client', 'name businessName phone')
-        .sort({ meetingDate: 1 })
-        .limit(5)
-        .lean(),
-      Todo.find({ isCompleted: false })
-        .populate('project', 'name')
-        .populate('client', 'name')
-        .sort({ priority: 1, dueDate: 1 })
-        .limit(5)
-        .lean(),
-    ]);
+    const divisionProjects = Object.values(divisionProjectMap).filter((d) => d.count > 0);
 
     return res.json({
       success: true,
       data: {
         metrics: {
+          totalProjects: allProjects.length,
+          activeProjects: statusCounts['In Progress'] + statusCounts['Approved'],
+          completedProjects: statusCounts['Completed'] || 0,
+          onHoldProjects: statusCounts['On Hold'] || 0,
+          totalContractValue,
+          milestoneCompletionRate: totalMilestonesCount > 0 ? Math.round((completedMilestonesCount / totalMilestonesCount) * 100) : 0,
+          totalMilestonesCount,
+          completedMilestonesCount,
+          // Revenue metrics for bottom placement
+          totalInvoiced,
+          totalReceived,
+          totalOutstanding,
+          totalInvoicesCount: invoices.length,
+        },
+        projectAnalysis: {
+          statusCounts,
+          detailedProjects,
+          divisionProjects,
+        },
+        revenueSummary: {
           totalInvoiced,
           totalReceived,
           totalOutstanding,
           overdueAmount,
-          totalUnallocatedAdvances,
-          activeProjects: activeProjectsCount,
-          totalClients: clientsCount,
-          totalInvoices: invoices.length,
-          pendingQuotations: quotationsCount,
-          pendingTodosCount: pendingTodos.length,
-          upcomingFollowupsCount: upcomingFollowups.length,
-        },
-        charts: {
-          monthlyTrends,
-          divisionRevenue,
-          agingBuckets,
-          outstandingVsReceived: [
-            { name: 'Received', value: totalReceived },
-            { name: 'Outstanding', value: totalOutstanding },
-          ],
-        },
-        topClientExposures,
-        projectHealth,
-        recentClients: recentClientsList,
-        clientTypeStats,
-        upcomingFollowups,
-        pendingTodos,
-        recent: {
-          payments: recentPayments,
-          projects: recentProjects,
-          invoices: recentInvoices,
+          collectionRate: totalInvoiced > 0 ? Math.min(100, Math.round((totalReceived / totalInvoiced) * 100)) : 0,
+          recentInvoices: recentInvoices.slice(0, 4),
         },
       },
     });
